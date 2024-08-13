@@ -1,7 +1,7 @@
 Role Name
 =========
 
-A brief description of the role goes here.
+This role will create a new linux vm on vcenter and add it to the awx controller under a host. And this will also assign a tag to the vm. 
 
 Requirements
 ------------

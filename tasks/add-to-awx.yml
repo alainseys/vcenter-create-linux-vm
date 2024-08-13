@@ -1,0 +1,13 @@
+---
+# tasks file for create-vm
+- name: Add host to AWX Collection
+  ansible.builtin.uri:
+    url: "https://ansible.yourdomain.com/api/v2/hosts/"
+    method: POST
+    body_format: json
+    body: '{"name": "{{ passed_vm_name }}", "description": "{{ passed_vm_name}} added to AWX using ansible", "enabled": true, "variables": "---\nansible_host: {{ passed_network_ip.msg }}", "inventory": {{ inventory_id}} }'
+    headers:
+      Authorization: 'Bearer {{ awx_token }}'
+    status_code: 201
+    validate_certs: false
+    follow_redirects: true
