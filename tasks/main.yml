@@ -1,5 +1,29 @@
 ---
 # tasks file for vcenter-create-linux-vm
+- name: Get free ip from netbox > from specefied range
+  ansible.builtin.uri:
+    url: "https://netbox.yourdomain.com/api/ipam/ip-ranges/{{ range_id }}/available-ips"
+    method: GET
+    headers:
+      Authorization: "Token {{ netbox_token }}"
+    validate_certs: false
+  register: subnet_appserver
+
+- name: Extract > first ip from this range
+  ansible.builtin.set_fact:
+    first_available_ip: "{{ subnet_appserver.json | first }}"
+- name: Print > Results
+  ansible.builtin.debug:
+    msg: "{{ first_available_ip.address.split('/')[0] }}"
+  when: first_available_ip is defined
+  register: network_ip
+- name: Print > Result with net
+  ansible.builtin.debug:
+    msg: "{{ first_available_ip.address }}"
+  when: first_available_ip is defined
+- name: Debug > Variable
+  ansible.builtin.debug:
+    var: "{{ network_ip }}"
 - name: Clone the template of vcenter
   community.vmware.vmware_guest:
       hostname: "{{ vcenter_hostname }}"
@@ -32,3 +56,34 @@
         dns_servers: "{{ dns_servers.split(',') }}"
       guest_id: "{{ guest_id }}"
   register: deploy_vm
+- name: Add IP > To netbox
+  ansible.builtin.uri:
+    url: "https://netbox.yourdomain.com/api/ipam/ip-addresses/"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Token {{ netbox_token }}"
+    body_format: json
+    body: |
+      {
+        "address": "{{ first_available_ip.address }}",
+        "status": "active",
+        "description": "IP Added by ansible",
+        "dns_name": "{{ vm_name | upper }}.yourdomain.com"
+      }
+    validate_certs: false
+  register: netbox_response
+  failed_when: netbox_response.status not in [200, 201]
+- name: Include add-to-awx.yml
+  ansible.builtin.include_tasks: add-to-awx.yml
+  vars:
+    passed_network_ip: "{{ network_ip }}"
+    passed_vm_name: "{{ vm_name | upper }}"
+    inventory_id: "11" # Update this value to your inventory id (check awx api for the id )
+- name: Include tag-vm.yml
+  ansible.builtin.include_takss: tag-vm.yml
+  vars:
+    passed_vm_name: "{{ vm_name | upper }}"
+    passed_tag_category: "VeeamBackup"
+    passed_tag_name: "Linux"
+
